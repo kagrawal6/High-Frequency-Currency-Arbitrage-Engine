@@ -1,4 +1,4 @@
-# CS759-Final-Project
+# High-Frequency Currency Arbitrage Engine
 
 Implementing foreign currency exchange arbitrage, a form of high-frequency trading. Forex arbitrage is the strategy of exploiting price disparity in the forex markets. It may be effected in various ways but however it is carried out, the arbitrage seeks to buy currency prices and sell currency prices that are currently divergent but extremely likely to rapidly converge. The expectation is that as prices move back towards a mean, the arbitrage becomes more profitable and can be closed, sometimes even in milliseconds.
 
