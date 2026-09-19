@@ -1,1 +1,0 @@
-Will contain output logs for testing perhaps, and also pdfs of any graphs we generate using scripts

@@ -1,5 +1,16 @@
 .idea/
 .vscode/
 .DS_Store
+.venv/
 
+*.o
 arbitrage
+benchmark
+test_engine
+*.exe
+
+project-root-*/src/*.o
+project-root-*/main.o
+project-root-*/benchmark.o
+project-root-*/tests/test_engine
+project-root-*/tests/*.o

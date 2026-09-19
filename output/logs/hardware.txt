@@ -1,0 +1,7 @@
+Apple M5 Pro
+logical_cpus=15
+physical_cpus=15
+compiler_seq=Apple clang version 21.0.0 (clang-2100.1.1.101)
+compiler_omp=Homebrew clang version 22.1.8
+nvcc=not_found
+date=Sat Sep 19 02:39:38 EDT 2026

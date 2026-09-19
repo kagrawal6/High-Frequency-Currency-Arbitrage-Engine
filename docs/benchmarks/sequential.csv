@@ -1,0 +1,2 @@
+backend,config,mean_wall_ms,stddev_wall_ms,mean_detect_ms,stddev_detect_ms,speedup,efficiency,timestamps,opportunities,mean_profit_usd,timestamps_per_sec
+sequential,1,279.462400,6.216964,13.922523,0.313274,1.000000,1.000000,86400,680,-33.333866,6205771.800167

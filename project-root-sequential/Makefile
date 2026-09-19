@@ -1,39 +1,47 @@
-# Makefile (place in project-root/)
+CXX      ?= clang++
+CXXFLAGS ?= -std=c++17 -O3 -Wall -Wextra -Iinclude
+LDFLAGS  ?=
 
-# Compiler
-CXX       := g++
-CXXFLAGS  := -std=c++17 -O3 -Wall -Wextra -Iinclude -fopenmp
+SRC := \
+    src/ArbitrageDetector.cpp \
+    src/CsvParser.cpp \
+    src/ForexGraph.cpp \
+    src/MarketData.cpp \
+    src/PositionsManager.cpp \
+    src/TimeSeriesArbitrageDetector.cpp \
+    src/Timer.cpp
 
-# Source directories
-SRC_DIR   := src
-INC_DIR   := include
+OBJ := $(SRC:.cpp=.o)
 
-# All .cpp files (main.cpp + everything in src/)
-SRCS      := main.cpp $(wildcard $(SRC_DIR)/*.cpp)
+.PHONY: all run benchmark bench-csv test plots clean
 
-# Corresponding .o files
-OBJS      := $(SRCS:.cpp=.o)
+all: arbitrage
 
-# Final executable
-TARGET    := arbitrage
+arbitrage: main.o $(OBJ)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-.PHONY: all run clean
+benchmark: benchmark.o $(OBJ)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-all: $(TARGET)
+tests/test_engine: tests/test_engine.o $(OBJ)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-# Link step
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) $^ -o $@
-
-# Compile any .cpp → .o
-# This rule works both for main.cpp and src/*.cpp
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Run the program (expects to be run from project-root/)
-run: $(TARGET)
-	./$(TARGET)
+run: arbitrage
+	./arbitrage
 
-# Clean up objects and binary
+bench-csv: benchmark
+	@mkdir -p benchmarks
+	./benchmark > benchmarks/benchmark_results.csv
+	@cat benchmarks/benchmark_results.csv
+
+test: tests/test_engine
+	./tests/test_engine
+
+plots: bench-csv
+	python3 ../scripts/generate_plots.py --sequential benchmarks/benchmark_results.csv --out output
+
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJ) main.o benchmark.o tests/test_engine.o arbitrage benchmark tests/test_engine

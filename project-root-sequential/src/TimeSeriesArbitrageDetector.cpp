@@ -1,85 +1,51 @@
-// // src/TimeSeriesArbitrageDetector.cpp
 #include "TimeSeriesArbitrageDetector.hpp"
-#include "ArbitrageDetector.hpp"
-#include <iostream>
+
+#include <algorithm>
 #include <iomanip>
+#include <iostream>
 
-TimeSeriesArbitrageDetector::TimeSeriesArbitrageDetector(
-    const std::vector<std::tuple<std::string,std::string,std::string,std::string>>& files
-) : currencyFiles(files) {
-    loadAllData();
-}
+#include "Timer.hpp"
 
-void TimeSeriesArbitrageDetector::loadAllData() {
-    // Group CurrencyPairData by timestamp_ms
-        std::map<int64_t,
-             std::map<std::pair<std::string,std::string>, CurrencyPairData>> buf;
-
-    for (const auto& tpl : currencyFiles) {
-        // Tuple is { askFile, bidFile, base, quote }
-        const auto& [askFile, bidFile, baseCurrency, quoteCurrency] = tpl;
-
-        // Pass bidFile first, askFile second:
-        auto vec = readCurrencyPairCsvs(bidFile, askFile, baseCurrency, quoteCurrency);
-        for (auto& dp : vec) {
-            buf[dp.timestamp_ms][{baseCurrency, quoteCurrency}] = dp;
-        }
-    }
-
-    // Flatten into timeSeriesData
-    for (auto& [ts, mp] : buf) {
-        auto& vec = timeSeriesData[ts];
-        for (auto& [_, dp] : mp) {
-            vec.push_back(dp);
-        }
-    }
-}
+TimeSeriesArbitrageDetector::TimeSeriesArbitrageDetector(MarketData market)
+    : market_(std::move(market)) {}
 
 void TimeSeriesArbitrageDetector::analyzeAllTimestamps(bool verbose) {
-    int count = 0, total = (int)timeSeriesData.size();
-    for (auto& [ts, dataVec] : timeSeriesData) {
-        if (verbose) {
-            std::cout << "[" << ++count << "/" << total << "] ts=" << ts << "\n";
+    Timer tAnalyze("Time-series detection");
+    opportunities.clear();
+    opportunities.reserve(256);
+    const int T = market_.nTimestamps;
+    for (int t = 0; t < T; ++t) {
+        if (verbose && (t % std::max(1, T / 10) == 0)) {
+            std::cout << "  [" << t << "/" << T << "] ts=" << market_.timestamps[t] << "\n";
         }
-
-        // Build graph for this timestamp
-        ForexGraph G;
-        for (auto& dp : dataVec) {
-            G.addExchangeRate(dp.baseCurrency, dp.quoteCurrency, dp.bid, dp.ask);
-        }
-        timestampGraphs[ts] = G;
-
-        // Detect arbitrage
-        auto arb = detectArbitrage(G);
-        if (!arb.cycle.empty()) {
-            arbitrageOpportunities.push_back({ts, arb});
+        auto arb = detectArbitrageAt(market_, t);
+        if (!arb.cycle.empty() && arb.profit > 0.0) {
+            opportunities.push_back({market_.timestamps[t], t, std::move(arb)});
         }
     }
+    tAnalyze.stop();
 }
 
 void TimeSeriesArbitrageDetector::printAllOpportunities() const {
-    std::cout << "\n===== ARBITRAGE OPPORTUNITIES =====\n";
-    for (const auto& tsArb : arbitrageOpportunities) {
-        std::cout << "ts=" << tsArb.timestamp_ms
-                  << " profit=" << tsArb.opportunity.profit << "%\n";
+    std::cout << "\n===== ARBITRAGE OPPORTUNITIES (" << opportunities.size() << ") =====\n";
+    for (const auto& tsArb : opportunities) {
+        std::cout << "ts=" << tsArb.timestamp_ms << " profit=" << std::fixed << std::setprecision(6)
+                  << tsArb.opportunity.profit << "%  cycle=";
+        for (size_t i = 0; i < tsArb.opportunity.cycle.size(); ++i) {
+            if (i) std::cout << "->";
+            std::cout << currencyName(tsArb.opportunity.cycle[i]);
+        }
+        if (!tsArb.opportunity.cycle.empty()) {
+            std::cout << "->" << currencyName(tsArb.opportunity.cycle.front());
+        }
+        std::cout << "\n";
     }
 }
 
-const std::vector<TimeStampedArbitrage>&
-TimeSeriesArbitrageDetector::getOpportunities() const {
-    return arbitrageOpportunities;
-}
-
-ForexGraph
-TimeSeriesArbitrageDetector::getGraphForTimestamp(int64_t timestamp_ms) const {
-    auto it = timestampGraphs.find(timestamp_ms);
-    if (it != timestampGraphs.end()) {
-        return it->second;
+ForexGraph TimeSeriesArbitrageDetector::getGraphForTimestamp(int64_t timestamp_ms) const {
+    auto it = std::lower_bound(market_.timestamps.begin(), market_.timestamps.end(), timestamp_ms);
+    if (it == market_.timestamps.end() || *it != timestamp_ms) {
+        return ForexGraph();
     }
-    // Fallback: rebuild on the fly
-    ForexGraph G;
-    for (auto& dp : timeSeriesData.at(timestamp_ms)) {
-        G.addExchangeRate(dp.baseCurrency, dp.quoteCurrency, dp.bid, dp.ask);
-    }
-    return G;
+    return market_.graphAt(static_cast<int>(it - market_.timestamps.begin()));
 }
